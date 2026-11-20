@@ -8,6 +8,10 @@ async def test_plan_replay_coverage(authed):
     planned = (await authed.post(f"/api/windows/{wid}/plan")).json()
     assert len(planned["slices"]) == 3
 
+    gate = (await authed.post(f"/api/windows/{wid}/gate/confirm", json={})).json()
+    assert gate["ledger"]["gate_status"] == "开闸"
+    assert gate["ledger"]["gate_no"] == f"GATE-{wid:04d}"
+
     first = planned["slices"][0]["id"]
     replayed = (await authed.post(f"/api/slices/{first}/replay")).json()["slice"]
     assert replayed["status"] == "已落库"
@@ -20,3 +24,5 @@ async def test_plan_replay_coverage(authed):
     assert report["planned"] == 3
     assert report["loaded"] == 1
     assert report["missing"] == 2
+    assert report["excess"] == 0
+    assert report["poured"] == replayed["row_count"]

@@ -8,12 +8,17 @@ from app.config import Config
 from app.db import init_db
 from app.services.errors import ServiceError
 from app.services.windows import (
+    confirm_gate,
     coverage_report,
+    gate_policy,
     list_coverage,
+    list_quotas,
     list_slices,
     list_windows,
     plan_slices,
     replay_slice,
+    set_quota,
+    window_detail,
 )
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -116,6 +121,57 @@ class ApiWindows:
             _json(resp, {"error": exc.message}, exc.status_code)
 
 
+class ApiQuotas:
+    async def on_get(self, req, resp):
+        try:
+            require_user(req)
+            _json(resp, {"items": list_quotas()})
+        except ServiceError as exc:
+            _json(resp, {"error": exc.message}, exc.status_code)
+
+
+class ApiQuotaSet:
+    async def on_post(self, req, resp, window_id):
+        try:
+            require_user(req)
+            body = await req.get_media() or {}
+            quota = int(body.get("quota"))
+            _json(resp, {"ledger": set_quota(int(window_id), quota)})
+        except ServiceError as exc:
+            _json(resp, {"error": exc.message}, exc.status_code)
+        except (TypeError, ValueError):
+            _json(resp, {"error": "额度无效"}, 400)
+
+
+class ApiGateConfirm:
+    async def on_post(self, req, resp, window_id):
+        try:
+            require_user(req)
+            body = await req.get_media() or {}
+            operator = str(body.get("operator") or "调度")
+            _json(resp, {"ledger": confirm_gate(int(window_id), operator)})
+        except ServiceError as exc:
+            _json(resp, {"error": exc.message}, exc.status_code)
+
+
+class ApiGatePolicy:
+    async def on_get(self, req, resp):
+        try:
+            require_user(req)
+            _json(resp, gate_policy())
+        except ServiceError as exc:
+            _json(resp, {"error": exc.message}, exc.status_code)
+
+
+class ApiWindowDetail:
+    async def on_get(self, req, resp, window_id):
+        try:
+            require_user(req)
+            _json(resp, window_detail(int(window_id)))
+        except ServiceError as exc:
+            _json(resp, {"error": exc.message}, exc.status_code)
+
+
 class ApiPlan:
     async def on_post(self, req, resp, window_id):
         try:
@@ -173,8 +229,13 @@ def create_app() -> falcon.asgi.App:
     app.add_route("/api/logout", ApiLogout())
     app.add_route("/api/meta", ApiMeta())
     app.add_route("/api/windows", ApiWindows())
+    app.add_route("/api/windows/{window_id:int}", ApiWindowDetail())
     app.add_route("/api/windows/{window_id:int}/plan", ApiPlan())
     app.add_route("/api/windows/{window_id:int}/slices", ApiSlices())
+    app.add_route("/api/windows/{window_id:int}/quota", ApiQuotaSet())
+    app.add_route("/api/windows/{window_id:int}/gate/confirm", ApiGateConfirm())
+    app.add_route("/api/quotas", ApiQuotas())
+    app.add_route("/api/gate-policy", ApiGatePolicy())
     app.add_route("/api/slices/{slice_id:int}/replay", ApiReplay())
     app.add_route("/api/coverage-reports", ApiCoverage())
     app.add_static_route("/static", str(STATIC))

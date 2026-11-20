@@ -10,6 +10,9 @@ class Config:
     ADMIN_USER = "admin"
     ADMIN_PASSWORD = "123456"
     DEFAULT_DB = str(ROOT / "instance" / "backfill_lab.db")
+    # 日窗默认配额（行）；超额落库走旁路凭证账册硬拦
+    DEFAULT_QUOTA = 500
+    GATE_MODE = "旁路凭证"
 
     @classmethod
     def database(cls) -> str:
